@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Nunito", ui-sans-serif, system-ui, sans-serif;
+  --color-duo-green: #58CC02;
+  --color-duo-green-dark: #58A700;
+  --color-duo-blue: #1CB0F6;
+  --color-duo-blue-dark: #1899D6;
+  --color-duo-yellow: #FFC800;
+  --color-duo-yellow-dark: #D7A800;
+  --color-duo-red: #FF4B4B;
+  --color-duo-red-dark: #EA2B2B;
+  --color-duo-purple: #CE82FF;
+  --color-duo-purple-dark: #A562D6;
+  --color-duo-gray: #E5E5E5;
+  --color-duo-gray-dark: #AFB0B3;
+}
+
+@layer utilities {
+  .shadow-btn-green {
+    box-shadow: 0 4px 0 var(--color-duo-green-dark);
+  }
+  .shadow-btn-blue {
+    box-shadow: 0 4px 0 var(--color-duo-blue-dark);
+  }
+  .shadow-btn-yellow {
+    box-shadow: 0 4px 0 var(--color-duo-yellow-dark);
+  }
+  .shadow-btn-red {
+    box-shadow: 0 4px 0 var(--color-duo-red-dark);
+  }
+  .shadow-btn-gray {
+    box-shadow: 0 4px 0 var(--color-duo-gray-dark);
+  }
+  .active-press {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 transparent !important;
+  }
+}
+
+body {
+  font-family: "Nunito", sans-serif;
+  background-color: #F7F7F7;
+  color: #3C3C3C;
+}
