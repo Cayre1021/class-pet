@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+
+import {HashRouter, Route, Routes} from 'react-router-dom';
 import Portal from './pages/Portal';
 import BigScreen from './pages/BigScreen';
 import TeacherPanel from './pages/TeacherPanel';
@@ -25,7 +27,7 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Portal />} />
         <Route path="/screen" element={<BigScreen />} />
@@ -34,6 +36,6 @@ export default function App() {
         <Route path="/student/:id" element={<StudentQuery />} />
         <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }

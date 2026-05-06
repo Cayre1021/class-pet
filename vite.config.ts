@@ -6,10 +6,11 @@ import { defineConfig, loadEnv } from 'vite';
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
-  
+  const isCapacitorBuild = mode === 'capacitor';
+
   return {
-    base: '/class-pet/', // 👉 合并在这里：解决 Gitee Pages 网页白屏的关键
-    
+    base: isCapacitorBuild ? './' : '/class-pet/',
+
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),

@@ -97,11 +97,19 @@ function TeacherAuth({ setUser }: { setUser: (user: { uid: string } | null) => v
   );
 }
 
-export default function TeacherPanel({ user, setUser }: { user: { uid: string } | null, setUser: (user: { uid: string } | null) => void }) {
+type TeacherUser = { uid: string };
+
+export default function TeacherPanel({ user, setUser }: { user: TeacherUser | null, setUser: (user: TeacherUser | null) => void }) {
   const { settings, loading } = useAppStore();
   const [unlocked, setUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
-  const [isSettingPin, setIsSettingPin] = useState(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem('class_pet_auth_user');
+    setUnlocked(false);
+    setPasswordInput('');
+    setUser(null);
+  };
 
   useEffect(() => {
     let unsub = () => {};
@@ -192,8 +200,8 @@ export default function TeacherPanel({ user, setUser }: { user: { uid: string } 
               验证进入
             </button>
           </form>
-          <button 
-            onClick={() => signOut(auth)}
+          <button
+            onClick={handleLogout}
             className="mt-6 text-neutral-400 hover:text-neutral-600 font-bold text-sm"
           >
             切换账号退出
@@ -203,10 +211,10 @@ export default function TeacherPanel({ user, setUser }: { user: { uid: string } 
     );
   }
 
-  return <TeacherDashboard user={user} />;
+  return <TeacherDashboard user={user} onLogout={handleLogout} />;
 }
 
-function TeacherDashboard({ user }: { user: User }) {
+function TeacherDashboard({ user, onLogout }: { user: TeacherUser; onLogout: () => void }) {
   const { students, settings, loading } = useAppStore();
   const [newStudentName, setNewStudentName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -361,8 +369,8 @@ function TeacherDashboard({ user }: { user: User }) {
             >
               <KeyRound className="w-5 h-5" /> 修改密码
             </button>
-            <button 
-              onClick={() => signOut(auth)}
+            <button
+              onClick={onLogout}
               className="flex items-center gap-2 text-neutral-400 hover:text-red-500 font-bold transition-colors"
             >
               <LogOut className="w-5 h-5" /> 退出
