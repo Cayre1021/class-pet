@@ -5,6 +5,7 @@
 *.aar
 *.ap_
 *.aab
+app/build/
 
 # Files for the ART/Dalvik VM
 *.dex

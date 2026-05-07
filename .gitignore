@@ -1,7 +1,11 @@
 node_modules/
 build/
 dist/
+dist-electron/
 coverage/
+release/
+release-assets/
+.claude/
 .DS_Store
 *.log
 .env*
@@ -9,3 +13,7 @@ coverage/
 .idea/
 *.iml
 *.tsbuildinfo
+*.apk
+*.aab
+*.exe
+*.blockmap

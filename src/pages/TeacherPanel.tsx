@@ -9,7 +9,13 @@ import confetti from 'canvas-confetti';
 const colors = ['red', 'blue', 'green', 'purple', 'yellow'];
 const EVOLUTION_POOL = ['Crown', 'Wings', 'Star', 'Aura', 'Glasses'];
 
-function TeacherAuth({ setUser }: { setUser: (user: { uid: string } | null) => void }) {
+function TeacherAuth({
+  setUser,
+  successMsg,
+}: {
+  setUser: (user: { uid: string } | null) => void;
+  successMsg?: string;
+}) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,6 +75,7 @@ function TeacherAuth({ setUser }: { setUser: (user: { uid: string } | null) => v
         <h2 className="text-2xl font-black text-center text-[var(--color-duo-purple)] mb-6">
           {isLogin ? '👑 教师登录' : '🌟 注册新账号'}
         </h2>
+        {successMsg && <p className="text-[var(--color-duo-green-dark)] font-bold text-sm text-center mb-4">{successMsg}</p>}
         {errorMsg && <p className="text-red-500 font-bold text-sm text-center mb-4">{errorMsg}</p>}
         <form onSubmit={handleAuth} className="space-y-4">
           {!isLogin && (
@@ -103,11 +110,13 @@ export default function TeacherPanel({ user, setUser }: { user: TeacherUser | nu
   const { settings, loading } = useAppStore();
   const [unlocked, setUnlocked] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
+  const [authSuccessMsg, setAuthSuccessMsg] = useState('');
 
   const handleLogout = () => {
     localStorage.removeItem('class_pet_auth_user');
     setUnlocked(false);
     setPasswordInput('');
+    setAuthSuccessMsg('');
     setUser(null);
   };
 
@@ -136,12 +145,14 @@ export default function TeacherPanel({ user, setUser }: { user: TeacherUser | nu
     }
     await updateClassPin(passwordInput);
     localStorage.removeItem('class_pet_auth_user');
+    setUnlocked(false);
+    setPasswordInput('');
+    setAuthSuccessMsg('班级管理密码设置成功，请使用新密码重新登录');
     setUser(null);
-    alert("班级管理密码设置成功！请重新登录");
   };
 
   if (!user) {
-    return <TeacherAuth setUser={setUser} />;
+    return <TeacherAuth setUser={setUser} successMsg={authSuccessMsg} />;
   }
 
   if (loading || !settings) {

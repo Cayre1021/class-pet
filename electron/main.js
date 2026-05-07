@@ -11,6 +11,7 @@ function createWindow() {
     height: 900,
     minWidth: 1080,
     minHeight: 720,
+    title: 'Class Pet',
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
