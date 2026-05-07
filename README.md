@@ -2,9 +2,10 @@
 
 班级电子宠物是一个基于 **React + Vite + TypeScript + Capacitor** 的班级激励系统。教师可以为学生加减分、驱动宠物成长，并在班级大屏和学生查询页中实时展示结果。
 
-项目当前同时维护两种运行形态：
+项目当前同时维护三种运行形态：
 - **Web 网页端**：用于 GitHub Pages / 浏览器访问
 - **Android App 端**：通过 Capacitor 将网页项目封装为原生 Android 工程
+- **Windows 桌面端**：通过 Electron 封装为可直接运行的 `.exe`
 
 ---
 
@@ -20,10 +21,17 @@
 - 当前 Android `applicationId`：`com.classpet.app`
 - 适用场景：Android Studio 编译、真机安装、APK 导出
 
+### Windows 桌面版本
+- 当前桌面端打包方式：Electron + electron-builder
+- 当前可执行文件输出目录：`release/`
+- 适用场景：Windows 本地安装、免安装运行、教室电脑离线使用
+
 ### 版本区分原则
 - **网页端更新**：使用 `npm run build`
 - **Android 端更新网页资源**：使用 `npm run build:android`
+- **Windows 桌面端打包**：使用 `npm run build:exe`
 - **Android APK 导出**：在 Android Studio 中继续完成，不是只靠 npm 命令完成
+- **Windows .exe 安装包导出**：由 Electron Builder 完成，不影响 GitHub Pages
 
 ---
 
@@ -159,6 +167,34 @@ npm run deploy
 npm run build
 ```
 
+### 7. Windows 桌面端开发模式
+
+```bash
+npm run dev:desktop
+```
+
+用途：
+- 用 Electron 启动桌面开发环境
+- 开发时仍然使用 Vite 本地服务
+- 只影响桌面端，不影响网页端和 Android 端构建
+
+### 8. Windows 桌面端打包
+
+```bash
+npm run build:exe
+```
+
+它实际会执行：
+
+```bash
+npm run build:desktop && electron-builder --win
+```
+
+用途：
+- 生成桌面端专用前端构建
+- 打包 Electron 主进程
+- 输出 Windows 可运行程序与安装包
+
 ---
 
 ## 网页端发布说明
@@ -179,6 +215,11 @@ npm run deploy
 
 ### 注意
 如果你未来把仓库名从 `class-pet` 改掉，或者 GitHub Pages 路径发生变化，需要同步调整 `vite.config.ts` 中网页端的 `base` 配置。
+
+桌面端和 Android 端是独立构建模式：
+- GitHub Pages 仍然只依赖网页端 `build`
+- Electron 与 Android 都不会直接改写 Pages 发布路径
+- 只要继续用 `npm run deploy` 发布网页端，就不会因为桌面端改造而额外引入白屏风险
 
 ---
 
@@ -277,6 +318,12 @@ npm run build
 npm run build:android
 ```
 
+### 如果你改的是网页端，并准备重新生成 Windows 桌面版
+
+```bash
+npm run build:exe
+```
+
 ### 如果你要重新导出 Android 安装包
 
 1. 先执行：
@@ -286,6 +333,26 @@ npm run build:android
 ```
 
 2. 再到 Android Studio 中重新构建 APK
+
+### 如果你要重新导出 Windows 安装包
+
+直接执行：
+
+```bash
+npm run build:exe
+```
+
+生成结果通常位于：
+
+```text
+release\Class Pet Setup 0.0.0.exe
+```
+
+免安装版本位于：
+
+```text
+release\win-unpacked\Class Pet.exe
+```
 
 ---
 
@@ -325,7 +392,10 @@ npm run build:android
 ### 3. Android 打包不等于自动生成 APK
 `npm run build:android` 只负责同步网页资源到 Android 工程；真正导出 APK 仍要靠 Android Studio。
 
-### 4. Windows 下 `clean` 脚本兼容性一般
+### 4. Windows 桌面版与网页端数据默认不互通
+桌面端同样使用本地存储，但它运行在 Electron 容器里，不会自动和浏览器里的本地数据互通。
+
+### 5. Windows 下 `clean` 脚本兼容性一般
 当前脚本是：
 
 ```bash
