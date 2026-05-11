@@ -291,9 +291,8 @@ describe('TeacherPanel teacher auth flow', () => {
     window.history.pushState({}, '', '/');
   });
 
-  it('registers a new teacher identity, returns to teacher verification, and enters with the login password', async () => {
+  it('keeps first-time users on the login page until they explicitly choose registration', async () => {
     const user = userEvent.setup();
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
     render(
       <MemoryRouter>
@@ -301,35 +300,59 @@ describe('TeacherPanel teacher auth flow', () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByText('教师登录')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '注册' })).toBeTruthy();
+
     await user.type(screen.getByPlaceholderText('班级名称'), '一班');
     await user.type(screen.getByPlaceholderText('教师姓名'), '张老师');
     await user.click(screen.getByRole('button', { name: '继续' }));
 
+    await waitFor(() => {
+      expect(screen.getByText('教师登录')).toBeTruthy();
+    });
+
+    expect(screen.getByText('该教师账号不存在，请先注册')).toBeTruthy();
+    expect(screen.queryByText('创建教师账号')).toBeNull();
+  });
+
+  it('registers a new teacher identity through the register link and enters the dashboard after setting the password', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <TeacherPanelHarness />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: '注册' }));
+
     await screen.findByText('创建教师账号');
+    expect(screen.getByPlaceholderText('班级名称')).toBeTruthy();
+    expect(screen.getByPlaceholderText('教师姓名')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('设置登录密码')).toBeNull();
+
+    await user.type(screen.getByPlaceholderText('班级名称'), '一班');
+    await user.type(screen.getByPlaceholderText('教师姓名'), '张老师');
+    await user.click(screen.getByRole('button', { name: '继续' }));
+
+    await screen.findByPlaceholderText('设置登录密码');
+    expect(screen.getByText(/一班/)).toBeTruthy();
+    expect(screen.getByText(/张老师/)).toBeTruthy();
 
     await user.type(screen.getByPlaceholderText('设置登录密码'), '1234');
     await user.type(screen.getByPlaceholderText('确认登录密码'), '1234');
     await user.click(screen.getByRole('button', { name: '创建账号' }));
 
-    await screen.findByText('教师验证');
-
-    expect(screen.getByText(/一班/)).toBeTruthy();
-    expect(screen.getByText(/张老师/)).toBeTruthy();
-    expect(screen.getByPlaceholderText('登录密码')).toBeTruthy();
-    expect(screen.queryByPlaceholderText('班级名称')).toBeNull();
-    expect(alertSpy).not.toHaveBeenCalled();
-
-    await waitFor(() => {
-      expect(screen.getByText('教师账号创建成功，请输入登录密码')).toBeTruthy();
-    });
-
-    await user.type(screen.getByPlaceholderText('登录密码'), '1234');
-    await user.click(screen.getByRole('button', { name: '进入教师工作台' }));
-
     await screen.findByText('教师工作台');
+
+    expect(db.getRememberedTeacherAccount()).toEqual({
+      accountKey: '一班::张老师',
+      className: '一班',
+      teacherName: '张老师',
+    });
   });
 
-  it('prompts for the existing teacher password after identity selection', async () => {
+  it('prompts for the existing teacher password after login identity selection', async () => {
     await db.registerTeacherAccount({
       className: '二班',
       teacherName: '李老师',
@@ -383,7 +406,8 @@ describe('TeacherPanel teacher auth flow', () => {
 
     await user.click(screen.getByRole('button', { name: '切换账号' }));
 
-    await screen.findByPlaceholderText('班级名称');
+    await screen.findByText('教师登录');
+    expect(screen.getByRole('button', { name: '注册' })).toBeTruthy();
     expect(db.getRememberedTeacherAccount()).toBeNull();
   });
 });

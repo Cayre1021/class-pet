@@ -38,7 +38,7 @@ export type TeacherUser = {
   teacherName: string;
 };
 
-type TeacherAuthMode = 'identity' | 'register' | 'password';
+type TeacherAuthMode = 'login' | 'registerIdentity' | 'registerPassword' | 'password';
 
 function TeacherAuth({
   setUser,
@@ -46,7 +46,7 @@ function TeacherAuth({
   setUser: (user: TeacherUser | null) => void;
 }) {
   const rememberedTeacher = useMemo(() => getRememberedTeacherAccount(), []);
-  const [mode, setMode] = useState<TeacherAuthMode>(rememberedTeacher ? 'password' : 'identity');
+  const [mode, setMode] = useState<TeacherAuthMode>(rememberedTeacher ? 'password' : 'login');
   const [className, setClassName] = useState(rememberedTeacher?.className ?? '');
   const [teacherName, setTeacherName] = useState(rememberedTeacher?.teacherName ?? '');
   const [password, setPassword] = useState('');
@@ -60,16 +60,18 @@ function TeacherAuth({
     setConfirmPassword('');
   };
 
-  const handleIdentitySubmit = (e: React.FormEvent) => {
+  const buildCurrentTeacher = () => ({
+    accountKey: `${className.trim()}::${teacherName.trim()}`,
+    className: className.trim(),
+    teacherName: teacherName.trim(),
+  });
+
+  const handleLoginIdentitySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setStatusMsg('');
 
-    const nextTeacher = {
-      accountKey: `${className.trim()}::${teacherName.trim()}`,
-      className: className.trim(),
-      teacherName: teacherName.trim(),
-    };
+    const nextTeacher = buildCurrentTeacher();
 
     if (!nextTeacher.className || !nextTeacher.teacherName) {
       setErrorMsg('请填写班级名称和教师姓名');
@@ -77,22 +79,39 @@ function TeacherAuth({
     }
 
     const existingTeacher = findTeacherAccount(nextTeacher.className, nextTeacher.teacherName);
-    if (existingTeacher) {
-      const teacherIdentity = {
-        accountKey: existingTeacher.accountKey,
-        className: existingTeacher.className,
-        teacherName: existingTeacher.teacherName,
-      };
-      setActiveTeacher(teacherIdentity);
-      rememberTeacherAccount(teacherIdentity);
+    if (!existingTeacher) {
+      setActiveTeacher(null);
       resetPasswordFields();
-      setMode('password');
+      setErrorMsg('该教师账号不存在，请先注册');
+      return;
+    }
+
+    const teacherIdentity = {
+      accountKey: existingTeacher.accountKey,
+      className: existingTeacher.className,
+      teacherName: existingTeacher.teacherName,
+    };
+    setActiveTeacher(teacherIdentity);
+    rememberTeacherAccount(teacherIdentity);
+    resetPasswordFields();
+    setMode('password');
+  };
+
+  const handleRegisterIdentitySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setStatusMsg('');
+
+    const nextTeacher = buildCurrentTeacher();
+
+    if (!nextTeacher.className || !nextTeacher.teacherName) {
+      setErrorMsg('请填写班级名称和教师姓名');
       return;
     }
 
     setActiveTeacher(nextTeacher);
     resetPasswordFields();
-    setMode('register');
+    setMode('registerPassword');
   };
 
   const handleRegisterSubmit = async (e: React.FormEvent) => {
@@ -102,7 +121,7 @@ function TeacherAuth({
 
     if (!activeTeacher) {
       setErrorMsg('请先填写班级名称和教师姓名');
-      setMode('identity');
+      setMode('registerIdentity');
       return;
     }
 
@@ -123,15 +142,16 @@ function TeacherAuth({
         password,
       });
       await initTeacherSettings(teacherAccount.accountKey);
-      rememberTeacherAccount(teacherAccount);
-      setActiveTeacher({
+      const teacherIdentity = {
         accountKey: teacherAccount.accountKey,
         className: teacherAccount.className,
         teacherName: teacherAccount.teacherName,
-      });
+      };
+      rememberTeacherAccount(teacherAccount);
+      setActiveTeacher(teacherIdentity);
       resetPasswordFields();
-      setStatusMsg('教师账号创建成功，请输入登录密码');
-      setMode('password');
+      clearLegacyTeacherAuthUser();
+      setUser(teacherIdentity);
     } catch (error: any) {
       if (error instanceof TeacherAccountExistsError) {
         setErrorMsg('该班级下的教师账号已存在');
@@ -169,7 +189,7 @@ function TeacherAuth({
     resetPasswordFields();
     setErrorMsg('');
     setStatusMsg('');
-    setMode('identity');
+    setMode('login');
   };
 
   return (
@@ -181,13 +201,13 @@ function TeacherAuth({
       </div>
       <div className="bg-white p-8 rounded-3xl shadow-lg max-w-sm w-full border-4 border-neutral-100">
         <h2 className="text-2xl font-black text-center text-[var(--color-duo-purple)] mb-6">
-          {mode === 'register' ? '创建教师账号' : mode === 'password' ? '教师验证' : '教师登录'}
+          {mode === 'password' ? '教师验证' : mode === 'registerIdentity' || mode === 'registerPassword' ? '创建教师账号' : '教师登录'}
         </h2>
         {statusMsg && <p className="text-[var(--color-duo-green-dark)] font-bold text-sm text-center mb-4">{statusMsg}</p>}
         {errorMsg && <p className="text-red-500 font-bold text-sm text-center mb-4">{errorMsg}</p>}
 
-        {mode === 'identity' && (
-          <form onSubmit={handleIdentitySubmit} className="space-y-4">
+        {mode === 'login' && (
+          <form onSubmit={handleLoginIdentitySubmit} className="space-y-4">
             <input
               type="text"
               placeholder="班级名称"
@@ -207,10 +227,46 @@ function TeacherAuth({
             <button type="submit" className="w-full bg-[var(--color-duo-blue)] text-white font-black text-lg rounded-2xl py-3 shadow-btn-blue active:translate-y-1 active:shadow-none transition-all mt-4">
               继续
             </button>
+            <button type="button" onClick={() => {
+              setErrorMsg('');
+              setStatusMsg('');
+              resetPasswordFields();
+              setActiveTeacher(null);
+              setMode('registerIdentity');
+            }} className="w-full text-neutral-400 hover:text-neutral-600 font-bold text-sm">
+              注册
+            </button>
           </form>
         )}
 
-        {mode === 'register' && activeTeacher && (
+        {mode === 'registerIdentity' && (
+          <form onSubmit={handleRegisterIdentitySubmit} className="space-y-4">
+            <input
+              type="text"
+              placeholder="班级名称"
+              value={className}
+              onChange={(event) => setClassName(event.target.value)}
+              className="w-full bg-neutral-100 rounded-xl p-3 font-bold outline-none focus:ring-4 ring-[var(--color-duo-purple-dark)]"
+              required
+            />
+            <input
+              type="text"
+              placeholder="教师姓名"
+              value={teacherName}
+              onChange={(event) => setTeacherName(event.target.value)}
+              className="w-full bg-neutral-100 rounded-xl p-3 font-bold outline-none focus:ring-4 ring-[var(--color-duo-purple-dark)]"
+              required
+            />
+            <button type="submit" className="w-full bg-[var(--color-duo-blue)] text-white font-black text-lg rounded-2xl py-3 shadow-btn-blue active:translate-y-1 active:shadow-none transition-all mt-4">
+              继续
+            </button>
+            <button type="button" onClick={handleSwitchAccount} className="w-full text-neutral-500 hover:text-[var(--color-duo-blue)] font-bold text-sm">
+              返回登录
+            </button>
+          </form>
+        )}
+
+        {mode === 'registerPassword' && activeTeacher && (
           <form onSubmit={handleRegisterSubmit} className="space-y-4">
             <div className="bg-neutral-100 rounded-2xl p-4 text-sm font-bold text-neutral-500 space-y-1">
               <div>班级：{activeTeacher.className}</div>
@@ -235,8 +291,13 @@ function TeacherAuth({
             <button type="submit" className="w-full bg-[var(--color-duo-blue)] text-white font-black text-lg rounded-2xl py-3 shadow-btn-blue active:translate-y-1 active:shadow-none transition-all mt-4">
               创建账号
             </button>
-            <button type="button" onClick={handleSwitchAccount} className="w-full text-neutral-500 hover:text-[var(--color-duo-blue)] font-bold text-sm">
-              返回重选教师身份
+            <button type="button" onClick={() => {
+              setErrorMsg('');
+              setStatusMsg('');
+              resetPasswordFields();
+              setMode('registerIdentity');
+            }} className="w-full text-neutral-500 hover:text-[var(--color-duo-blue)] font-bold text-sm">
+              返回修改教师信息
             </button>
           </form>
         )}
