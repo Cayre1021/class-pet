@@ -15,14 +15,19 @@ import {
   updateTeacherProfileColor,
   updateTeacherStudentPoints,
   validateTeacherCredentials,
+  addTeacherBehaviorRule,
+  deleteTeacherStudents,
+  type PetType,
 } from '../lib/db';
 import { LogOut, Plus, Search, Check, AlertCircle, Home, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import clsx from 'clsx';
+import { getStudentPetVisual } from '../lib/pets';
 
 const colors = ['red', 'blue', 'green', 'purple', 'yellow'] as const;
+const petTypes: PetType[] = ['bird', 'bunny', 'puppy', 'fish', 'dragon'];
 const profileColorClasses: Record<(typeof colors)[number], string> = {
   red: 'bg-red-400',
   blue: 'bg-blue-400',
@@ -379,6 +384,10 @@ function TeacherDashboard({
   const [nextPassword, setNextPassword] = useState('');
   const [confirmNextPassword, setConfirmNextPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [positiveRuleName, setPositiveRuleName] = useState('');
+  const [positiveRulePoints, setPositiveRulePoints] = useState('');
+  const [negativeRuleName, setNegativeRuleName] = useState('');
+  const [negativeRulePoints, setNegativeRulePoints] = useState('');
 
   useEffect(() => {
     const savedColor = getTeacherAccount(user.accountKey)?.profileColor;
@@ -401,6 +410,8 @@ function TeacherDashboard({
     });
   };
 
+  const buildRandomPetType = () => petTypes[Math.floor(Math.random() * petTypes.length)];
+
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentName.trim()) return;
@@ -413,6 +424,8 @@ function TeacherDashboard({
       exp: 0,
       level: 1,
       effects: [],
+      petType: buildRandomPetType(),
+      hatchState: 'egg',
     });
     setNewStudentName('');
     showToast('添加成功！');
@@ -473,11 +486,52 @@ function TeacherDashboard({
         exp: 0,
         level: 1,
         effects: [],
+        petType: buildRandomPetType(),
+        hatchState: 'egg',
       });
     }
     setNewStudentName('');
     setBatchMode(false);
     showToast(`成功批量添加 ${names.length} 名学生！`);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedStudents.length === 0) {
+      showToast('请先选择学生！', 'error');
+      return;
+    }
+
+    if (!window.confirm(`确定删除已选中的 ${selectedStudents.length} 名学生吗？`)) {
+      return;
+    }
+
+    await deleteTeacherStudents(user.accountKey, selectedStudents);
+    setSelectedStudents([]);
+    showToast('已删除选中学生');
+  };
+
+  const handleAddCustomRule = async (type: 'positive' | 'negative') => {
+    const name = (type === 'positive' ? positiveRuleName : negativeRuleName).trim();
+    const rawPoints = type === 'positive' ? positiveRulePoints : negativeRulePoints;
+    const points = Number(rawPoints);
+
+    if (!name || !Number.isFinite(points) || points <= 0) {
+      showToast('请填写事项名称和有效分值', 'error');
+      return;
+    }
+
+    await addTeacherBehaviorRule(user.accountKey, { name, points, type });
+
+    if (type === 'positive') {
+      setPositiveRuleName('');
+      setPositiveRulePoints('');
+      showToast('已添加加分项');
+      return;
+    }
+
+    setNegativeRuleName('');
+    setNegativeRulePoints('');
+    showToast('已添加扣分项');
   };
 
   const handleProfileColorChange = async (nextColor: (typeof colors)[number]) => {
@@ -656,11 +710,19 @@ function TeacherDashboard({
                 >
                   全选
                 </button>
+                <button
+                  onClick={handleDeleteSelected}
+                  className="bg-red-100 text-red-600 px-4 rounded-2xl font-bold hover:bg-red-200 disabled:opacity-50"
+                  disabled={selectedStudents.length === 0}
+                >
+                  删除选中
+                </button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {filtered.map((student) => {
                   const isSelected = selectedStudents.includes(student.id);
+                  const petVisual = getStudentPetVisual(student);
                   return (
                     <motion.div
                       whileTap={{ scale: 0.96 }}
@@ -669,8 +731,9 @@ function TeacherDashboard({
                       className={`cursor-pointer rounded-2xl p-4 border-4 transition-all relative ${isSelected ? 'border-[var(--color-duo-blue)] bg-blue-50' : 'border-transparent bg-white shadow-sm'}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-neutral-100 rounded-xl flex items-center justify-center text-2xl">
-                          {student.level >= 5 ? '🐉' : student.level >= 2 ? '🐥' : '🥚'}
+                        <div className={clsx('w-12 h-12 rounded-xl flex items-center justify-center text-2xl relative', petVisual.bg)}>
+                          {petVisual.face}
+                          {petVisual.readyToHatch && <span className="absolute -top-2 bg-[var(--color-duo-yellow)] text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">可孵化</span>}
                         </div>
                         <div>
                           <div className="font-black text-neutral-800">{student.name}</div>
@@ -721,7 +784,7 @@ function TeacherDashboard({
                 </form>
               </div>
 
-              <div className="bg-white rounded-3xl justify-center items-center p-6 shadow-sm border-2 border-neutral-100 sticky top-8">
+              <div className="relative z-10 bg-white rounded-3xl p-6 shadow-sm border-2 border-neutral-100 lg:sticky lg:top-8">
                 <h3 className="font-black text-xl mb-2 text-neutral-800">快捷操作</h3>
                 <p className="text-sm text-neutral-400 font-bold mb-4">
                   当前选中: <span className="text-[var(--color-duo-blue)]">{selectedStudents.length}</span> 人
@@ -735,11 +798,33 @@ function TeacherDashboard({
                         <button
                           key={rule.id}
                           onClick={() => handleAction(rule.points, rule.name)}
-                          className="bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 font-bold py-2 px-3 rounded-xl text-sm transition-colors"
+                          className="min-h-11 bg-green-50 text-green-700 border-2 border-green-200 hover:bg-green-100 font-bold py-2 px-3 rounded-xl text-sm transition-colors"
                         >
                           {rule.name} (+{rule.points})
                         </button>
                       ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_96px]">
+                      <input
+                        className="min-h-11 bg-neutral-100 border-2 border-transparent rounded-xl px-4 py-3 font-bold text-sm text-neutral-700 outline-none focus:border-[var(--color-duo-green)] focus:bg-white"
+                        placeholder="新增加分事项"
+                        value={positiveRuleName}
+                        onChange={(event) => setPositiveRuleName(event.target.value)}
+                      />
+                      <input
+                        className="min-h-11 bg-neutral-100 border-2 border-transparent rounded-xl px-4 py-3 font-bold text-sm text-neutral-700 outline-none focus:border-[var(--color-duo-green)] focus:bg-white"
+                        placeholder="加分分值"
+                        inputMode="numeric"
+                        value={positiveRulePoints}
+                        onChange={(event) => setPositiveRulePoints(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomRule('positive')}
+                        className="w-full min-h-11 sm:col-span-2 bg-[var(--color-duo-green)] text-white font-black px-4 rounded-xl text-sm shadow-btn-green active:translate-y-1 active:shadow-none transition-all"
+                      >
+                        添加加分项
+                      </button>
                     </div>
                   </div>
 
@@ -750,11 +835,33 @@ function TeacherDashboard({
                         <button
                           key={rule.id}
                           onClick={() => handleAction(rule.points, rule.name)}
-                          className="bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100 font-bold py-2 px-3 rounded-xl text-sm transition-colors"
+                          className="min-h-11 bg-red-50 text-red-700 border-2 border-red-200 hover:bg-red-100 font-bold py-2 px-3 rounded-xl text-sm transition-colors"
                         >
                           {rule.name} ({rule.points})
                         </button>
                       ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_96px]">
+                      <input
+                        className="min-h-11 bg-neutral-100 border-2 border-transparent rounded-xl px-4 py-3 font-bold text-sm text-neutral-700 outline-none focus:border-[var(--color-duo-red)] focus:bg-white"
+                        placeholder="新增扣分事项"
+                        value={negativeRuleName}
+                        onChange={(event) => setNegativeRuleName(event.target.value)}
+                      />
+                      <input
+                        className="min-h-11 bg-neutral-100 border-2 border-transparent rounded-xl px-4 py-3 font-bold text-sm text-neutral-700 outline-none focus:border-[var(--color-duo-red)] focus:bg-white"
+                        placeholder="扣分分值"
+                        inputMode="numeric"
+                        value={negativeRulePoints}
+                        onChange={(event) => setNegativeRulePoints(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddCustomRule('negative')}
+                        className="w-full min-h-11 sm:col-span-2 bg-[var(--color-duo-red)] text-white font-black px-4 rounded-xl text-sm shadow-btn-red active:translate-y-1 active:shadow-none transition-all"
+                      >
+                        添加扣分项
+                      </button>
                     </div>
                   </div>
                 </div>

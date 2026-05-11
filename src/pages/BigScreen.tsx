@@ -46,7 +46,7 @@ export default function BigScreen() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {sortedStudents.map((student, i) => (
-              <PetCard key={student.id} student={student} delay={i * 0.05} />
+              <PetCard key={student.id} student={student} delay={i * 0.05} accountKey={rememberedTeacher?.accountKey} />
             ))}
           </div>
         )}

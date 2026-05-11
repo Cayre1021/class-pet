@@ -1,3 +1,6 @@
+export type PetType = 'bird' | 'bunny' | 'puppy' | 'fish' | 'dragon';
+export type HatchState = 'egg' | 'ready' | 'hatched';
+
 export interface Student {
   id: string;
   name: string;
@@ -6,6 +9,9 @@ export interface Student {
   exp: number;
   level: number;
   effects: string[];
+  petType: PetType;
+  hatchState: HatchState;
+  mood: number;
   lastInteractionTime: number;
   createdAt: number;
 }
@@ -55,6 +61,12 @@ export interface RegisterTeacherAccountInput {
   profileColor?: string;
 }
 
+export interface AddBehaviorRuleInput {
+  name: string;
+  points: number;
+  type: 'positive' | 'negative';
+}
+
 const STORAGE_KEYS = {
   TEACHERS: 'class_pet_teachers',
   LAST_TEACHER: 'class_pet_last_teacher',
@@ -66,6 +78,7 @@ const STORAGE_KEYS = {
 
 const STORAGE_UPDATE_EVENT = 'local-storage-update';
 const DEFAULT_PROFILE_COLOR = 'purple';
+const PET_TYPES: PetType[] = ['bird', 'bunny', 'puppy', 'fish', 'dragon'];
 
 type StorageUpdateDetail = {
   key: string | null;
@@ -115,6 +128,47 @@ const removeFromStorage = (key: string) => {
 
 const shouldHandleStorageChange = (eventKey: string | null, targetKey: string) =>
   eventKey === null || eventKey === targetKey;
+
+const getStablePetType = (seed: string): PetType => {
+  const total = seed.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return PET_TYPES[total % PET_TYPES.length];
+};
+
+const normalizeHatchState = (student: Omit<Student, 'petType' | 'hatchState' | 'mood'> & Partial<Pick<Student, 'petType' | 'hatchState' | 'mood'>>): HatchState => {
+  if (student.hatchState) {
+    return student.hatchState;
+  }
+  return student.level >= 2 ? 'hatched' : 'egg';
+};
+
+const normalizeMood = (student: Omit<Student, 'petType' | 'hatchState' | 'mood'> & Partial<Pick<Student, 'petType' | 'hatchState' | 'mood'>>) => {
+  if (typeof student.mood === 'number' && Number.isFinite(student.mood)) {
+    return Math.max(10, Math.min(100, Math.round(student.mood)));
+  }
+  return 100;
+};
+
+const normalizeStudent = (
+  student: Omit<Student, 'petType' | 'hatchState' | 'mood'> & Partial<Pick<Student, 'petType' | 'hatchState' | 'mood'>>,
+): Student => ({
+  ...student,
+  petType: student.petType ?? getStablePetType(student.id),
+  hatchState: normalizeHatchState(student),
+  mood: normalizeMood(student),
+});
+
+const normalizeStudents = (
+  students: Array<Omit<Student, 'petType' | 'hatchState' | 'mood'> & Partial<Pick<Student, 'petType' | 'hatchState' | 'mood'>>>,
+) => students.map(normalizeStudent);
+
+const createStudentRecord = (
+  studentData: Omit<Student, 'createdAt' | 'lastInteractionTime' | 'mood'>,
+  now = Date.now(),
+): Student => normalizeStudent({
+  ...studentData,
+  lastInteractionTime: now,
+  createdAt: now,
+});
 
 const subscribeToStorageKey = <T>(
   storageKey: string,
@@ -256,7 +310,8 @@ export const clearRememberedTeacherAccount = () => {
   removeFromStorage(STORAGE_KEYS.LAST_TEACHER);
 };
 
-export const getSharedStudents = () => getFromStorage<Student[]>(STORAGE_KEYS.STUDENTS, []);
+export const getSharedStudents = () =>
+  normalizeStudents(getFromStorage<Student[]>(STORAGE_KEYS.STUDENTS, []));
 
 export const getSharedSettings = () => getFromStorage<Settings | null>(STORAGE_KEYS.SETTINGS, null);
 
@@ -272,15 +327,10 @@ export const subscribeToSharedSettings = (callback: (settings: Settings | null) 
   subscribeToStorageKey(STORAGE_KEYS.SETTINGS, getSharedSettings, callback);
 
 export const createSharedStudent = async (
-  studentData: Omit<Student, 'createdAt' | 'lastInteractionTime'>,
+  studentData: Omit<Student, 'createdAt' | 'lastInteractionTime' | 'mood'>,
 ) => {
   const students = getSharedStudents();
-  const now = Date.now();
-  const newStudent: Student = {
-    ...studentData,
-    lastInteractionTime: now,
-    createdAt: now,
-  };
+  const newStudent = createStudentRecord(studentData);
   setToStorage(STORAGE_KEYS.STUDENTS, [...students, newStudent]);
 };
 
@@ -309,15 +359,37 @@ export const updateSharedStudentPoints = async (
 
   setToStorage(STORAGE_KEYS.LOGS, [...logs, newLog]);
 
-  const newExp = Math.max(0, students[studentIndex].exp + expOffset);
+  const currentStudent = students[studentIndex];
+  const newExp = Math.max(0, currentStudent.exp + expOffset);
+  const nextHatchState = currentStudent.hatchState === 'hatched'
+    ? 'hatched'
+    : newLevel >= 2
+      ? 'ready'
+      : 'egg';
+
   students[studentIndex] = {
-    ...students[studentIndex],
+    ...currentStudent,
     exp: newExp,
     level: newLevel,
     effects: newEffects,
+    hatchState: nextHatchState,
   };
 
   setToStorage(STORAGE_KEYS.STUDENTS, students);
+};
+
+const getInteractionMoodBoost = () => Math.floor(Math.random() * 5) + 1;
+
+const applyStudentInteraction = (student: Student, now = Date.now()): Student => {
+  const hoursSince = (now - student.lastInteractionTime) / (1000 * 60 * 60);
+  const currentMood = Math.max(10, Math.min(100, student.mood - hoursSince * 5));
+  const nextMood = Math.min(100, Math.round(currentMood + getInteractionMoodBoost()));
+
+  return {
+    ...student,
+    mood: nextMood,
+    lastInteractionTime: now,
+  };
 };
 
 export const updateSharedStudentInteraction = async (studentId: string) => {
@@ -325,11 +397,32 @@ export const updateSharedStudentInteraction = async (studentId: string) => {
   const studentIndex = students.findIndex((student) => student.id === studentId);
   if (studentIndex === -1) return;
 
-  students[studentIndex].lastInteractionTime = Date.now();
+  students[studentIndex] = applyStudentInteraction(students[studentIndex]);
   setToStorage(STORAGE_KEYS.STUDENTS, students);
 };
 
 export const updateStudentInteraction = updateSharedStudentInteraction;
+
+export const hatchSharedStudentPet = async (studentId: string) => {
+  const students = getSharedStudents();
+  const studentIndex = students.findIndex((student) => student.id === studentId);
+  if (studentIndex === -1) return;
+
+  students[studentIndex] = {
+    ...students[studentIndex],
+    hatchState: 'hatched',
+    lastInteractionTime: Date.now(),
+  };
+  setToStorage(STORAGE_KEYS.STUDENTS, students);
+};
+
+export const deleteSharedStudents = async (studentIds: string[]) => {
+  const studentIdSet = new Set(studentIds);
+  const students = getSharedStudents().filter((student) => !studentIdSet.has(student.id));
+  const logs = getSharedBehaviorLogs().filter((log) => !studentIdSet.has(log.studentId));
+  setToStorage(STORAGE_KEYS.STUDENTS, students);
+  setToStorage(STORAGE_KEYS.LOGS, logs);
+};
 
 export const updateSharedClassPin = async (pin: string) => {
   const settings = createSettingsWithDefaults(getSharedSettings());
@@ -346,7 +439,7 @@ export const initSharedSettings = async () => {
 };
 
 export const getTeacherStudents = (accountKey: string) =>
-  getFromStorage<Student[]>(getTeacherStudentsStorageKey(accountKey), []);
+  normalizeStudents(getFromStorage<Student[]>(getTeacherStudentsStorageKey(accountKey), []));
 
 export const getTeacherSettings = (accountKey: string) =>
   getFromStorage<Settings | null>(getTeacherSettingsStorageKey(accountKey), null);
@@ -368,15 +461,10 @@ export const subscribeToTeacherSettings = (
 
 export const createTeacherStudent = async (
   accountKey: string,
-  studentData: Omit<Student, 'createdAt' | 'lastInteractionTime'>,
+  studentData: Omit<Student, 'createdAt' | 'lastInteractionTime' | 'mood'>,
 ) => {
   const students = getTeacherStudents(accountKey);
-  const now = Date.now();
-  const newStudent: Student = {
-    ...studentData,
-    lastInteractionTime: now,
-    createdAt: now,
-  };
+  const newStudent = createStudentRecord(studentData);
   setToStorage(getTeacherStudentsStorageKey(accountKey), [...students, newStudent]);
 };
 
@@ -406,12 +494,20 @@ export const updateTeacherStudentPoints = async (
 
   setToStorage(getTeacherLogsStorageKey(accountKey), [...logs, newLog]);
 
-  const newExp = Math.max(0, students[studentIndex].exp + expOffset);
+  const currentStudent = students[studentIndex];
+  const newExp = Math.max(0, currentStudent.exp + expOffset);
+  const nextHatchState = currentStudent.hatchState === 'hatched'
+    ? 'hatched'
+    : newLevel >= 2
+      ? 'ready'
+      : 'egg';
+
   students[studentIndex] = {
-    ...students[studentIndex],
+    ...currentStudent,
     exp: newExp,
     level: newLevel,
     effects: newEffects,
+    hatchState: nextHatchState,
   };
 
   setToStorage(getTeacherStudentsStorageKey(accountKey), students);
@@ -422,8 +518,43 @@ export const updateTeacherStudentInteraction = async (accountKey: string, studen
   const studentIndex = students.findIndex((student) => student.id === studentId);
   if (studentIndex === -1) return;
 
-  students[studentIndex].lastInteractionTime = Date.now();
+  students[studentIndex] = applyStudentInteraction(students[studentIndex]);
   setToStorage(getTeacherStudentsStorageKey(accountKey), students);
+};
+
+export const hatchTeacherStudentPet = async (accountKey: string, studentId: string) => {
+  const students = getTeacherStudents(accountKey);
+  const studentIndex = students.findIndex((student) => student.id === studentId);
+  if (studentIndex === -1) return;
+
+  students[studentIndex] = {
+    ...students[studentIndex],
+    hatchState: 'hatched',
+    lastInteractionTime: Date.now(),
+  };
+  setToStorage(getTeacherStudentsStorageKey(accountKey), students);
+};
+
+export const deleteTeacherStudents = async (accountKey: string, studentIds: string[]) => {
+  const studentIdSet = new Set(studentIds);
+  const students = getTeacherStudents(accountKey).filter((student) => !studentIdSet.has(student.id));
+  const logs = getTeacherBehaviorLogs(accountKey).filter((log) => !studentIdSet.has(log.studentId));
+  setToStorage(getTeacherStudentsStorageKey(accountKey), students);
+  setToStorage(getTeacherLogsStorageKey(accountKey), logs);
+};
+
+export const addTeacherBehaviorRule = async (accountKey: string, input: AddBehaviorRuleInput) => {
+  const settings = createSettingsWithDefaults(getTeacherSettings(accountKey));
+  const nextRule: BehaviorRule = {
+    id: `rule_${Date.now()}_${Math.random()}`,
+    name: input.name.trim(),
+    points: input.type === 'negative' ? -Math.abs(input.points) : Math.abs(input.points),
+    type: input.type,
+  };
+
+  settings.rules = [...settings.rules, nextRule];
+  settings.updatedAt = Date.now();
+  setToStorage(getTeacherSettingsStorageKey(accountKey), settings);
 };
 
 export const updateTeacherClassPin = async (accountKey: string, pin: string) => {

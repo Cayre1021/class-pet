@@ -8,6 +8,12 @@ import TeacherPanel from './TeacherPanel';
 import * as db from '../lib/db';
 import { initSharedSync, initTeacherSync, useAppStore } from '../lib/store';
 
+const dashboardUser = {
+  accountKey: '一班::张老师',
+  className: '一班',
+  teacherName: '张老师',
+};
+
 function TeacherPanelHarness({
   initialUser = null,
 }: {
@@ -52,6 +58,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     expect(db.getTeacherStudents(accountA.accountKey)).toHaveLength(1);
@@ -81,6 +89,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     await db.updateTeacherStudentPoints(
@@ -111,7 +121,10 @@ describe('TeacherPanel storage helpers', () => {
         exp: 8,
         level: 2,
         effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
         lastInteractionTime: 111,
+        mood: 100,
         createdAt: 111,
       },
     ];
@@ -121,7 +134,13 @@ describe('TeacherPanel storage helpers', () => {
 
     const stop = initSharedSync();
 
-    expect(useAppStore.getState().students).toEqual(legacyStudents);
+    expect(useAppStore.getState().students).toEqual([
+      {
+        ...legacyStudents[0],
+        petType: 'bird',
+        hatchState: 'egg',
+      },
+    ]);
     expect(useAppStore.getState().settings).toEqual(legacySettings);
     expect(useAppStore.getState().loading).toBe(false);
 
@@ -215,6 +234,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     await db.createTeacherStudent(accountA.accountKey, {
@@ -225,6 +246,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     expect(snapshots).toEqual([[], ['std_a']]);
@@ -254,6 +277,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
     await db.createTeacherStudent(accountB.accountKey, {
       id: 'std_b',
@@ -263,6 +288,8 @@ describe('TeacherPanel storage helpers', () => {
       exp: 0,
       level: 1,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     const stop = initTeacherSync(accountB.accountKey);
@@ -379,13 +406,13 @@ describe('TeacherPanel teacher auth flow', () => {
     expect(screen.queryByPlaceholderText('设置登录密码')).toBeNull();
   });
 
-  it('restores the remembered teacher identity on app boot and clears it when switching accounts', async () => {
+  it('requires the remembered teacher to enter the password again every time they re-enter teacher management from the homepage', async () => {
     const account = await db.registerTeacherAccount({
       className: '三班',
       teacherName: '王老师',
       password: '2468',
     });
-    db.rememberTeacherAccount(account);
+    await db.initTeacherSettings(account.accountKey);
     localStorage.setItem('class_pet_auth_user', 'legacy@example.com');
     window.history.pushState({}, '', '/#/admin');
 
@@ -393,21 +420,222 @@ describe('TeacherPanel teacher auth flow', () => {
 
     render(<App />);
 
+    await screen.findByText('教师登录');
+    await user.type(screen.getByPlaceholderText('班级名称'), '三班');
+    await user.type(screen.getByPlaceholderText('教师姓名'), '王老师');
+    await user.click(screen.getByRole('button', { name: '继续' }));
+
+    await screen.findByText('教师验证');
+    await user.type(screen.getByPlaceholderText('登录密码'), '2468');
+    await user.click(screen.getByRole('button', { name: '进入教师工作台' }));
+
+    await screen.findByText('教师工作台');
+
+    await user.click(screen.getByRole('link', { name: /返回主页/ }));
+    await screen.findByText('班级电子宠物平台');
+
+    await user.click(screen.getByRole('link', { name: /教师管理/ }));
     await screen.findByText('教师验证');
 
     expect(screen.getByText(/三班/)).toBeTruthy();
     expect(screen.getByText(/王老师/)).toBeTruthy();
     expect(screen.getByPlaceholderText('登录密码')).toBeTruthy();
-    expect(screen.queryByPlaceholderText('班级名称')).toBeNull();
+    expect(screen.queryByText('教师工作台')).toBeNull();
 
     await waitFor(() => {
       expect(localStorage.getItem('class_pet_auth_user')).toBeNull();
     });
+  });
 
-    await user.click(screen.getByRole('button', { name: '切换账号' }));
+  it('creates students with a random pet type and initial egg hatch state', async () => {
+    await db.registerTeacherAccount({
+      className: dashboardUser.className,
+      teacherName: dashboardUser.teacherName,
+      password: '1234',
+    });
+    await db.initTeacherSettings(dashboardUser.accountKey);
 
-    await screen.findByText('教师登录');
-    expect(screen.getByRole('button', { name: '注册' })).toBeTruthy();
-    expect(db.getRememberedTeacherAccount()).toBeNull();
+    const user = userEvent.setup();
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.4);
+
+    render(
+      <MemoryRouter>
+        <TeacherPanel user={dashboardUser} setUser={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('教师工作台');
+    await user.type(screen.getByPlaceholderText('输入姓名'), '测试学生');
+    await user.click(screen.getByRole('button', { name: '添加' }));
+
+    await waitFor(() => {
+      expect(db.getTeacherStudents(dashboardUser.accountKey)).toHaveLength(1);
+    });
+
+    expect(db.getTeacherStudents(dashboardUser.accountKey)[0]).toMatchObject({
+      name: '测试学生',
+      petType: 'puppy',
+      hatchState: 'egg',
+    });
+    expect(randomSpy).toHaveBeenCalled();
+  });
+
+  it('keeps add-student and custom-rule inputs focusable and uses mobile-friendly custom rule rows', async () => {
+    await db.registerTeacherAccount({
+      className: dashboardUser.className,
+      teacherName: dashboardUser.teacherName,
+      password: '1234',
+    });
+    await db.initTeacherSettings(dashboardUser.accountKey);
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <TeacherPanel user={dashboardUser} setUser={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('教师工作台');
+
+    const addStudentInput = screen.getByPlaceholderText('输入姓名');
+    await user.click(addStudentInput);
+    expect(document.activeElement).toBe(addStudentInput);
+
+    const positiveNameInput = screen.getByPlaceholderText('新增加分事项');
+    const positivePointsInput = screen.getByPlaceholderText('加分分值');
+    const negativeNameInput = screen.getByPlaceholderText('新增扣分事项');
+    const negativePointsInput = screen.getByPlaceholderText('扣分分值');
+
+    await user.click(positiveNameInput);
+    expect(document.activeElement).toBe(positiveNameInput);
+    await user.click(positivePointsInput);
+    expect(document.activeElement).toBe(positivePointsInput);
+    await user.click(negativeNameInput);
+    expect(document.activeElement).toBe(negativeNameInput);
+    await user.click(negativePointsInput);
+    expect(document.activeElement).toBe(negativePointsInput);
+
+    const positiveButton = screen.getByRole('button', { name: '添加加分项' });
+    const negativeButton = screen.getByRole('button', { name: '添加扣分项' });
+    const positiveRow = positiveButton.parentElement;
+    const negativeRow = negativeButton.parentElement;
+
+    expect(positiveRow?.className).toContain('grid-cols-1');
+    expect(negativeRow?.className).toContain('grid-cols-1');
+    expect(positiveButton.className).toContain('w-full');
+    expect(negativeButton.className).toContain('w-full');
+  });
+
+  it('adds custom positive and negative rules and reuses them in score actions', async () => {
+    await db.registerTeacherAccount({
+      className: dashboardUser.className,
+      teacherName: dashboardUser.teacherName,
+      password: '1234',
+    });
+    await db.initTeacherSettings(dashboardUser.accountKey);
+    await db.createTeacherStudent(dashboardUser.accountKey, {
+      id: 'std_rule',
+      name: '规则学生',
+      nickname: '规则学生的宠物',
+      eggColor: 'green',
+      exp: 0,
+      level: 1,
+      effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
+    });
+
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <TeacherPanel user={dashboardUser} setUser={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('教师工作台');
+
+    await user.type(screen.getByPlaceholderText('新增加分事项'), '主动分享');
+    await user.type(screen.getByPlaceholderText('加分分值'), '6');
+    await user.click(screen.getByRole('button', { name: '添加加分项' }));
+
+    await user.type(screen.getByPlaceholderText('新增扣分事项'), '随手乱放');
+    await user.type(screen.getByPlaceholderText('扣分分值'), '4');
+    await user.click(screen.getByRole('button', { name: '添加扣分项' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '主动分享 (+6)' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: '随手乱放 (-4)' })).toBeTruthy();
+    });
+
+    await user.click(screen.getByText('规则学生'));
+    await user.click(screen.getByRole('button', { name: '主动分享 (+6)' }));
+    await user.click(screen.getByRole('button', { name: '随手乱放 (-4)' }));
+
+    await waitFor(() => {
+      expect(db.getTeacherStudents(dashboardUser.accountKey)[0]?.exp).toBe(2);
+    });
+
+    const rules = db.getTeacherSettings(dashboardUser.accountKey)?.rules ?? [];
+    expect(rules.some((rule) => rule.name === '主动分享' && rule.points === 6 && rule.type === 'positive')).toBe(true);
+    expect(rules.some((rule) => rule.name === '随手乱放' && rule.points === -4 && rule.type === 'negative')).toBe(true);
+  });
+
+  it('deletes selected students only from the active teacher account', async () => {
+    const accountA = await db.registerTeacherAccount({
+      className: dashboardUser.className,
+      teacherName: dashboardUser.teacherName,
+      password: '1234',
+    });
+    const accountB = await db.registerTeacherAccount({
+      className: '二班',
+      teacherName: '李老师',
+      password: '5678',
+    });
+    await db.initTeacherSettings(accountA.accountKey);
+    await db.initTeacherSettings(accountB.accountKey);
+    await db.createTeacherStudent(accountA.accountKey, {
+      id: 'std_delete_a',
+      name: '测试甲',
+      nickname: '测试甲的宠物',
+      eggColor: 'red',
+      exp: 0,
+      level: 1,
+      effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
+    });
+    await db.createTeacherStudent(accountB.accountKey, {
+      id: 'std_delete_b',
+      name: '测试乙',
+      nickname: '测试乙的宠物',
+      eggColor: 'blue',
+      exp: 0,
+      level: 1,
+      effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
+    });
+
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(
+      <MemoryRouter>
+        <TeacherPanel user={dashboardUser} setUser={() => undefined} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('教师工作台');
+    await user.click(screen.getByText('测试甲'));
+    await user.click(screen.getByRole('button', { name: '删除选中' }));
+
+    await waitFor(() => {
+      expect(db.getTeacherStudents(accountA.accountKey)).toHaveLength(0);
+    });
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(db.getTeacherStudents(accountB.accountKey).map((student) => student.name)).toEqual(['测试乙']);
   });
 });

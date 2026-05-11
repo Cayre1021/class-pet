@@ -9,6 +9,8 @@ import * as db from '../lib/db';
 import { useAppStore } from '../lib/store';
 
 describe('public pages follow remembered teacher scope', () => {
+  let rememberedTeacherAccountKey = '';
+
   beforeEach(async () => {
     localStorage.clear();
     useAppStore.setState({
@@ -39,6 +41,8 @@ describe('public pages follow remembered teacher scope', () => {
       exp: 30,
       level: 2,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     await db.createTeacherStudent(accountB.accountKey, {
@@ -49,6 +53,8 @@ describe('public pages follow remembered teacher scope', () => {
       exp: 45,
       level: 2,
       effects: [],
+      petType: 'bird',
+      hatchState: 'egg',
     });
 
     await db.updateTeacherStudentPoints(
@@ -61,6 +67,7 @@ describe('public pages follow remembered teacher scope', () => {
       '课堂表现',
     );
 
+    rememberedTeacherAccountKey = accountB.accountKey;
     db.rememberTeacherAccount(accountB);
   });
 
@@ -115,5 +122,35 @@ describe('public pages follow remembered teacher scope', () => {
 
     expect(screen.getByText('小红')).toBeTruthy();
     expect(screen.queryByText('小明')).toBeNull();
+  });
+
+  it('keeps hatch-ready pets scoped to the remembered teacher in public views', async () => {
+    const readyStudent = db.getTeacherStudents(rememberedTeacherAccountKey)[0];
+    localStorage.setItem(
+      `class_pet_students:${rememberedTeacherAccountKey}`,
+      JSON.stringify([
+        {
+          ...readyStudent,
+          exp: 50,
+          level: 2,
+          petType: 'fish',
+          hatchState: 'ready',
+        },
+      ]),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/student/std_b']}>
+        <Routes>
+          <Route path="/student/:id" element={<StudentQuery />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('可孵化')).toBeTruthy();
+    });
+
+    expect(screen.queryByText('🐟')).toBeNull();
   });
 });

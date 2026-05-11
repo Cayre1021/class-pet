@@ -4,6 +4,7 @@ import { getRememberedTeacherAccount } from '../lib/db';
 import { motion } from 'framer-motion';
 import { Trophy, TrendingUp, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getStudentPetVisual } from '../lib/pets';
 
 export default function Dashboard() {
   const { students, loading } = useAppStore();
@@ -56,8 +57,8 @@ export default function Dashboard() {
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xl shadow-sm ${index === 0 ? 'bg-[var(--color-duo-yellow)] text-white' : index === 1 ? 'bg-neutral-300 text-white' : index === 2 ? 'bg-orange-300 text-white' : 'bg-neutral-200 text-neutral-500'}`}>
                   {index + 1}
                 </div>
-                <div className="w-14 h-14 bg-white rounded-xl shadow-inner flex items-center justify-center text-3xl">
-                  {student.level >= 5 ? '🐉' : (student.level >= 2 ? '🐥' : '🥚')}
+                <div className={`w-14 h-14 rounded-xl shadow-inner flex items-center justify-center text-3xl ${getStudentPetVisual(student).bg}`}>
+                  {getStudentPetVisual(student).face}
                 </div>
                 <div className="flex-1">
                   <div className="font-black text-neutral-800 text-xl">{student.name}</div>

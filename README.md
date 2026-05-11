@@ -12,12 +12,12 @@
 ## 当前版本说明
 
 ### Web 版本
-- 当前仓库前端包版本：`0.0.0`（见 `package.json`）
+- 当前仓库前端包版本：`0.1.0`（见 `package.json`）
 - 当前网页端部署基路径：`/class-pet/`
 - 适用场景：GitHub Pages、浏览器本地运行、局域网演示
 
 ### Android 版本
-- 当前 Android `versionName`：`1.0`
+- 当前 Android `versionName`：`0.1.0`
 - 当前 Android `applicationId`：`com.classpet.app`
 - 适用场景：Android Studio 编译、真机安装、APK 导出
 
@@ -25,6 +25,15 @@
 - 当前桌面端打包方式：Electron + electron-builder
 - 当前可执行文件输出目录：`release/`
 - 适用场景：Windows 本地安装、免安装运行、教室电脑离线使用
+
+## 更新日志
+
+### v0.1.0 · 2026-05-11 13:32
+- 教师管理改为按“班级名称 + 教师姓名”隔离数据，并且每次从首页重新进入教师管理都必须再次输入密码。
+- 教师工作台新增批量删除学生、自定义加分项、自定义扣分项，并修复 EXE 中文本框聚焦、高亮和移动端排版问题。
+- 宠物系统改为随机隐藏宠物路线：先显示宠物蛋，达到阈值后进入可孵化状态，点击后再揭晓宠物。
+- 宠物心情值保持原有衰减规律，但每次互动只随机恢复 1% 到 5%，并移除了低心情灰化效果。
+- 已重新验证网页端、桌面端与 Android 资源同步流程；GitHub Pages 继续使用网页端 `npm run build` / `npm run deploy`，避免被 Capacitor 或 Electron 构建覆盖。
 
 ### 版本区分原则
 - **网页端更新**：使用 `npm run build`
@@ -345,7 +354,7 @@ npm run build:exe
 生成结果通常位于：
 
 ```text
-release\Class Pet Setup 0.0.0.exe
+release\Class Pet Setup 0.1.0.exe
 ```
 
 免安装版本位于：

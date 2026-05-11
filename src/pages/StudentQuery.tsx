@@ -103,7 +103,7 @@ export default function StudentQuery() {
           
           {/* We reuse the PetCard but make it a bit larger by wrapping. It scales reasonably. */}
           <div className="transform scale-100 origin-top">
-            <PetCard student={student} />
+            <PetCard student={student} accountKey={rememberedTeacher?.accountKey} />
           </div>
         </div>
 
