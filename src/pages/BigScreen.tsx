@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAppStore, initSync } from '../lib/store';
+import { getRememberedTeacherAccount } from '../lib/db';
 import { motion } from 'framer-motion';
 import AIAssistant from '../components/AIAssistant';
 import PetCard from '../components/PetCard';
@@ -8,11 +9,12 @@ import { Home } from 'lucide-react';
 
 export default function BigScreen() {
   const { students, loading } = useAppStore();
+  const rememberedTeacher = useMemo(() => getRememberedTeacherAccount(), []);
 
   useEffect(() => {
-    const unsub = initSync();
+    const unsub = initSync(rememberedTeacher?.accountKey);
     return () => unsub();
-  }, []);
+  }, [rememberedTeacher?.accountKey]);
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center font-black text-2xl text-[var(--color-duo-gray-dark)]">加载中...</div>;

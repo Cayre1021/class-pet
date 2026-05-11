@@ -3,27 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
-
-import {HashRouter, Route, Routes} from 'react-router-dom';
+import { HashRouter, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import Portal from './pages/Portal';
 import BigScreen from './pages/BigScreen';
-import TeacherPanel from './pages/TeacherPanel';
+import TeacherPanel, { type TeacherUser } from './pages/TeacherPanel';
 import StudentQuery from './pages/StudentQuery';
 import Dashboard from './pages/Dashboard';
-import { useEffect, useState } from 'react';
-import { initSettings } from './lib/db';
+import { clearLegacyTeacherAuthUser, initSharedSettings } from './lib/db';
 
 export default function App() {
-  const [user, setUser] = useState<{ uid: string } | null>(null);
+  const [user, setUser] = useState<TeacherUser | null>(null);
 
   useEffect(() => {
-    // Check local storage for simple auth state
-    const localUser = localStorage.getItem('class_pet_auth_user');
-    if (localUser) {
-      setUser({ uid: localUser });
-    }
-    initSettings();
+    clearLegacyTeacherAuthUser();
+    initSharedSettings();
   }, []);
 
   return (

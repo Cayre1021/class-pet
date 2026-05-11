@@ -1,16 +1,18 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useAppStore, initSync } from '../lib/store';
+import { getRememberedTeacherAccount } from '../lib/db';
 import { motion } from 'framer-motion';
 import { Trophy, TrendingUp, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { students, loading } = useAppStore();
+  const rememberedTeacher = useMemo(() => getRememberedTeacherAccount(), []);
 
   useEffect(() => {
-    const unsub = initSync();
+    const unsub = initSync(rememberedTeacher?.accountKey);
     return () => unsub();
-  }, []);
+  }, [rememberedTeacher?.accountKey]);
 
   if (loading) return <div>Loading...</div>;
 

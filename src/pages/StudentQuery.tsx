@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppStore, initSync } from '../lib/store';
-import { BehaviorLog } from '../lib/db';
+import { getRememberedTeacherAccount, getSharedBehaviorLogs, getTeacherBehaviorLogs } from '../lib/db';
 import PetCard from '../components/PetCard';
 import { Search, ChevronLeft, Calendar, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -10,27 +10,25 @@ export default function StudentQuery() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { students, loading } = useAppStore();
+  const rememberedTeacher = useMemo(() => getRememberedTeacherAccount(), []);
   const [searchTerm, setSearchTerm] = useState("");
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
   useEffect(() => {
-    const unsub = initSync();
+    const unsub = initSync(rememberedTeacher?.accountKey);
     return () => unsub();
-  }, []);
+  }, [rememberedTeacher?.accountKey]);
 
   useEffect(() => {
     if (id) {
-      // Fetch logs
       const fetchLogs = async () => {
         setLogsLoading(true);
-        // Using localStorage for logs
         try {
-          const allLogsStr = localStorage.getItem('class_pet_logs');
-          const allLogs = allLogsStr ? JSON.parse(allLogsStr) : [];
-          let fetched = allLogs.filter((log: any) => log.studentId === id);
-          fetched.sort((a: any, b: any) => b.timestamp - a.timestamp);
-          setLogs(fetched);
+          const fetched = rememberedTeacher?.accountKey
+            ? getTeacherBehaviorLogs(rememberedTeacher.accountKey, id)
+            : getSharedBehaviorLogs(id);
+          setLogs([...fetched].sort((a, b) => b.timestamp - a.timestamp));
         } catch (e) {
           console.error(e);
         }
@@ -38,7 +36,7 @@ export default function StudentQuery() {
       };
       fetchLogs();
     }
-  }, [id]);
+  }, [id, rememberedTeacher?.accountKey]);
 
   if (loading) return <div className="text-center p-8">加载中...</div>;
 
