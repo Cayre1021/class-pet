@@ -18,6 +18,14 @@ const eggColorMap: Record<string, string> = {
   yellow: 'bg-yellow-400',
 };
 
+const hatchedPetBackgroundMap: Record<PetType, string> = {
+  bird: 'bg-sky-200',
+  bunny: 'bg-pink-200',
+  puppy: 'bg-amber-200',
+  fish: 'bg-cyan-200',
+  dragon: 'bg-lime-200',
+};
+
 export const isStudentReadyToHatch = (student: Student) =>
   student.level >= HATCH_LEVEL && student.hatchState === 'ready';
 
@@ -25,12 +33,13 @@ export const getPetTypeEmoji = (petType: PetType) => petTypeEmojiMap[petType];
 
 export const getStudentPetVisual = (student: Student) => {
   const readyToHatch = isStudentReadyToHatch(student);
-  const face = student.hatchState === 'hatched' ? getPetTypeEmoji(student.petType) : '🥚';
+  const hatched = student.hatchState === 'hatched';
+  const face = hatched ? getPetTypeEmoji(student.petType) : '🥚';
 
   return {
     face,
-    bg: eggColorMap[student.eggColor] || 'bg-gray-400',
+    bg: hatched ? hatchedPetBackgroundMap[student.petType] : eggColorMap[student.eggColor] || 'bg-gray-400',
     readyToHatch,
-    hatched: student.hatchState === 'hatched',
+    hatched,
   };
 };
